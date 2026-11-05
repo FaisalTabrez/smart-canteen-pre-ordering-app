@@ -1,0 +1,8 @@
+[
+  {"id": 1, "name": "Masala Dosa", "price": 60},
+  {"id": 2, "name": "Idli Sambar", "price": 40},
+  {"id": 3, "name": "Veg Biryani", "price": 100},
+  {"id": 4, "name": "Veg Sandwich", "price": 55},
+  {"id": 5, "name": "Samosa", "price": 15},
+  {"id": 6, "name": "Tea", "price": 20}
+]
