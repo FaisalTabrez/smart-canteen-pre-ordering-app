@@ -1,351 +1,348 @@
 import 'package:flutter/material.dart';
-import 'store.dart';
-import 'screens.dart';
+import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
+import 'menu_api.dart';
+import 'models.dart';
 
-const forest = Color(0xFF214D3D);
-const ink = Color(0xFF253C32);
-const cream = Color(0xFFF8F7F2);
-const muted = Color(0xFF748078);
-const orange = Color(0xFFD86636);
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final controller = CanteenController(PreferencesStore());
-  await controller.load();
-  runApp(CanteenApp(controller: controller));
-}
+void main() => runApp(const CanteenApp());
 
 class CanteenApp extends StatelessWidget {
-  const CanteenApp({super.key, required this.controller});
-  final CanteenController controller;
+  const CanteenApp({super.key, this.loadMenu = fetchMenu});
+  final Future<List<Food>> Function() loadMenu;
+
   @override
-  Widget build(BuildContext context) => MaterialApp(
-    title: 'Smart Canteen',
-    debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      scaffoldBackgroundColor: cream,
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: forest,
-        primary: forest,
-        secondary: orange,
-        surface: cream,
-      ),
-      fontFamily: 'Lato',
-      fontFamilyFallback: const ['Noto Color Emoji'],
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 36,
-          fontWeight: FontWeight.w800,
-          color: ink,
-          letterSpacing: -1.2,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 28,
-          fontWeight: FontWeight.w800,
-          color: ink,
-          letterSpacing: -0.7,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 21,
-          fontWeight: FontWeight.w700,
-          color: ink,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          color: ink,
-        ),
-        bodyMedium: TextStyle(fontSize: 14, color: ink, height: 1.45),
-        bodySmall: TextStyle(fontSize: 12, color: muted, height: 1.4),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(
-          minimumSize: const Size(48, 48),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          minimumSize: const Size(48, 44),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: Colors.white,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE0E5DD)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE0E5DD)),
-        ),
-        contentPadding: const EdgeInsets.all(16),
-      ),
+  Widget build(BuildContext context) => ChangeNotifierProvider(
+    create: (_) => Canteen(),
+    child: MaterialApp(
+      title: 'Smart Canteen',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(colorSchemeSeed: Colors.teal, useMaterial3: true),
+      routes: {
+        '/': (_) => MenuPage(loadMenu: loadMenu),
+        '/cart': (_) => const CartPage(),
+        '/orders': (_) => const OrdersPage(),
+      },
     ),
-    home: CanteenHome(controller: controller),
   );
 }
 
-class CanteenHome extends StatefulWidget {
-  const CanteenHome({super.key, required this.controller});
-  final CanteenController controller;
+class MenuPage extends StatefulWidget {
+  const MenuPage({super.key, required this.loadMenu});
+  final Future<List<Food>> Function() loadMenu;
   @override
-  State<CanteenHome> createState() => _CanteenHomeState();
+  State<MenuPage> createState() => _MenuPageState();
 }
 
-class _CanteenHomeState extends State<CanteenHome> {
-  int _selected = 0;
-  void select(int index) => setState(() => _selected = index);
+class _MenuPageState extends State<MenuPage> with SingleTickerProviderStateMixin {
+  List<Food> foods = [];
+  bool loading = true, sample = false;
+  String? error;
+  late final animation = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 500),
+  );
+
   @override
-  Widget build(BuildContext context) => ListenableBuilder(
-    listenable: widget.controller,
-    builder: (context, _) {
-      final c = widget.controller;
-      final wide = MediaQuery.sizeOf(context).width >= 950;
-      final active = c.orders.where((order) => order.active).length;
-      final destinations = [
-        const NavigationDestination(
-          icon: Icon(Icons.restaurant_menu_rounded),
-          label: 'Menu',
-        ),
-        NavigationDestination(
-          icon: Badge(
-            isLabelVisible: c.count > 0,
-            label: Text('${c.count}'),
-            child: const Icon(Icons.shopping_bag_outlined),
+  void initState() {
+    super.initState();
+    load();
+  }
+
+  Future<void> load({bool useSample = false}) async {
+    setState(() {
+      loading = true;
+      error = null;
+    });
+    try {
+      final result = useSample
+          ? parseMenu(await rootBundle.loadString('assets/menu.json'))
+          : await widget.loadMenu();
+      if (!mounted) return;
+      setState(() {
+        foods = result;
+        loading = false;
+        sample = useSample;
+      });
+      animation.forward(from: 0);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+        error = 'Could not load the menu. Check your connection.';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    animation.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final columns = MediaQuery.sizeOf(context).width >= 900
+        ? 3
+        : MediaQuery.sizeOf(context).width >= 600
+        ? 2
+        : 1;
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Smart Canteen'),
+        actions: [
+          IconButton(
+            tooltip: 'Cart',
+            icon: const Icon(Icons.shopping_cart),
+            onPressed: () => Navigator.pushNamed(context, '/cart'),
           ),
-          label: 'Cart',
-        ),
-        NavigationDestination(
-          icon: Badge(
-            isLabelVisible: active > 0,
-            label: Text('$active'),
-            child: const Icon(Icons.receipt_long_outlined),
+          IconButton(
+            tooltip: 'Orders',
+            icon: const Icon(Icons.receipt_long),
+            onPressed: () => Navigator.pushNamed(context, '/orders'),
           ),
-          label: 'Orders',
-        ),
-      ];
-      return Scaffold(
-        bottomNavigationBar: wide
-            ? null
-            : NavigationBar(
-                selectedIndex: _selected,
-                onDestinationSelected: select,
-                destinations: destinations,
-                backgroundColor: Colors.white,
-                indicatorColor: const Color(0xFFE1EBDD),
-              ),
-        body: SafeArea(
-          child: Row(
-            children: [
-              if (wide)
-                Container(
-                  width: 220,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(right: BorderSide(color: Color(0xFFE8EBE4))),
+        ],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : error != null
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(error!, textAlign: TextAlign.center),
+                  TextButton(onPressed: load, child: const Text('Retry')),
+                  TextButton(
+                    onPressed: () => load(useSample: true),
+                    child: const Text('Use sample menu'),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(24, 32, 20, 40),
-                        child: Brand(),
+                ],
+              ),
+            )
+          : Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Text(
+                    sample
+                        ? 'Sample menu (offline) • Pay at pickup'
+                        : 'Digital menu • Pay at pickup',
+                  ),
+                ),
+                Expanded(
+                  child: FadeTransition(
+                    key: const Key('menu-fade'),
+                    opacity: animation,
+                    child: SlideTransition(
+                      key: const Key('menu-slide'),
+                      position: Tween(
+                        begin: const Offset(0, .08),
+                        end: Offset.zero,
+                      ).animate(animation),
+                      child: GridView.count(
+                        padding: const EdgeInsets.all(12),
+                        crossAxisCount: columns,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        mainAxisExtent: 205,
+                        children: foods.map((food) => FoodCard(food: food)).toList(),
                       ),
-                      for (var index = 0; index < 3; index++)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 4,
-                          ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: ListTile(
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(14),
-                              ),
-                              selected: _selected == index,
-                              selectedColor: forest,
-                              selectedTileColor: const Color(0xFFEAF0E7),
-                              leading: destinations[index].icon,
-                              title: Text(
-                                destinations[index].label,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              onTap: () => select(index),
-                            ),
-                          ),
-                        ),
-                      const Spacer(),
-                      Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Container(
-                          padding: const EdgeInsets.all(18),
-                          decoration: BoxDecoration(
-                            color: cream,
-                            borderRadius: BorderRadius.circular(18),
-                          ),
-                          child: const Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class FoodCard extends StatelessWidget {
+  const FoodCard({super.key, required this.food});
+  final Food food;
+  @override
+  Widget build(BuildContext context) => Card(
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        children: [
+          Expanded(
+            child: Stack(
+              alignment: Alignment.bottomRight,
+              children: [
+                Center(child: Image.asset('assets/meal.png', semanticLabel: 'Meal', height: 80)),
+                Text('₹${food.price}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+          ),
+          Text(food.name, style: Theme.of(context).textTheme.titleMedium),
+          QuantityButtons(food: food),
+        ],
+      ),
+    ),
+  );
+}
+
+class QuantityButtons extends StatelessWidget {
+  const QuantityButtons({super.key, required this.food});
+  final Food food;
+  @override
+  Widget build(BuildContext context) {
+    final canteen = context.watch<Canteen>();
+    final quantity = canteen.quantity(food);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          tooltip: 'Remove ${food.name}',
+          icon: const Icon(Icons.remove),
+          onPressed: quantity == 0 ? null : () => canteen.change(food, -1),
+        ),
+        Text('$quantity'),
+        IconButton(
+          tooltip: 'Add ${food.name}',
+          icon: const Icon(Icons.add),
+          onPressed: quantity == 20 ? null : () => canteen.change(food, 1),
+        ),
+      ],
+    );
+  }
+}
+
+class CartPage extends StatefulWidget {
+  const CartPage({super.key});
+  @override
+  State<CartPage> createState() => _CartPageState();
+}
+
+class _CartPageState extends State<CartPage> {
+  final form = GlobalKey<FormState>();
+  String name = '';
+  int minutes = 15;
+
+  @override
+  Widget build(BuildContext context) {
+    final canteen = context.watch<Canteen>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Cart')),
+      body: canteen.cart.isEmpty
+          ? const Center(child: Text('Your cart is empty.'))
+          : Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 600),
+                child: ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    for (final item in canteen.cart)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(8),
+                          child: Row(
                             children: [
-                              Icon(Icons.eco_outlined, color: forest),
-                              SizedBox(height: 12),
-                              Text(
-                                'A little less waiting.\nA little more living.',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  height: 1.6,
-                                ),
-                              ),
-                              SizedBox(height: 10),
-                              Text(
-                                'Made for campus life.',
-                                style: TextStyle(color: muted, fontSize: 12),
-                              ),
+                              Expanded(child: Text('${item.food.name}\n₹${item.food.price} each')),
+                              QuantityButtons(food: item.food),
                             ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: wide ? 36 : 20,
-                        vertical: 18,
-                      ),
-                      child: Row(
+                    Text('Total: ₹${canteen.total}', style: Theme.of(context).textTheme.titleLarge),
+                    const SizedBox(height: 16),
+                    Form(
+                      key: form,
+                      child: Column(
                         children: [
-                          if (!wide)
-                            const Expanded(child: Brand())
-                          else
-                            const Expanded(
-                              child: Text(
-                                'CAMPUS DINING, SIMPLIFIED',
-                                style: TextStyle(
-                                  color: muted,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 1.8,
-                                ),
-                              ),
-                            ),
-                          const Icon(
-                            Icons.location_on_outlined,
-                            size: 17,
-                            color: forest,
+                          TextFormField(
+                            decoration: const InputDecoration(labelText: 'Pickup name'),
+                            maxLength: 40,
+                            onSaved: (value) => name = value!.trim(),
+                            validator: (value) => (value?.trim().length ?? 0) < 2
+                                ? 'Enter at least 2 characters'
+                                : null,
                           ),
-                          const SizedBox(width: 5),
-                          Text(
-                            wide ? 'Main Campus Canteen' : 'Main Campus',
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          DropdownButtonFormField<int>(
+                            initialValue: minutes,
+                            decoration: const InputDecoration(labelText: 'Pickup time'),
+                            items: [15, 30, 45, 60]
+                                .map(
+                                  (value) => DropdownMenuItem(
+                                    value: value,
+                                    child: Text('In $value minutes'),
+                                  ),
+                                )
+                                .toList(),
+                            onChanged: (value) => setState(() => minutes = value!),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton(
+                            onPressed: () {
+                              if (!form.currentState!.validate()) return;
+                              form.currentState!.save();
+                              canteen.placeOrder(name, minutes);
+                              Navigator.pushReplacementNamed(context, '/orders');
+                            },
+                            child: const Text('Place order'),
                           ),
                         ],
                       ),
                     ),
-                    const Divider(height: 1, color: Color(0xFFE6E9E1)),
-                    if (c.message != null)
-                      MaterialBanner(
-                        content: Text(c.message!),
-                        leading: const Icon(Icons.info_outline),
-                        actions: [
-                          TextButton(
-                            onPressed: c.dismissMessage,
-                            child: const Text('Dismiss'),
-                          ),
-                        ],
-                      ),
-                    Expanded(
-                      child: IndexedStack(
-                        index: _selected,
-                        children: [
-                          MenuScreen(controller: c, onCart: () => select(1)),
-                          CartScreen(
-                            controller: c,
-                            onMenu: () => select(0),
-                            onOrdered: () => select(2),
-                          ),
-                          OrdersScreen(
-                            controller: c,
-                            onMenu: () => select(0),
-                            onCart: () => select(1),
-                          ),
-                        ],
-                      ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Demo only. Pay at pickup. Orders reset when the app restarts.',
+                      textAlign: TextAlign.center,
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
-        ),
-      );
-    },
-  );
+            ),
+    );
+  }
 }
 
-class Brand extends StatelessWidget {
-  const Brand({super.key});
+class OrdersPage extends StatelessWidget {
+  const OrdersPage({super.key});
   @override
-  Widget build(BuildContext context) => FittedBox(
-    fit: BoxFit.scaleDown,
-    alignment: Alignment.centerLeft,
-    child: Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 38,
-          height: 38,
-          decoration: BoxDecoration(
-            color: forest,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: const Icon(
-            Icons.ramen_dining_rounded,
-            color: Colors.white,
-            size: 23,
-          ),
-        ),
-        const SizedBox(width: 10),
-        const Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'smart canteen',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.6,
-                color: forest,
-              ),
+  Widget build(BuildContext context) {
+    final canteen = context.watch<Canteen>();
+    return Scaffold(
+      appBar: AppBar(title: const Text('Order status')),
+      body: canteen.orders.isEmpty
+          ? const Center(child: Text('No orders yet.'))
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const Text('Demo: use the button to simulate kitchen updates.'),
+                for (final order in canteen.orders)
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Order #${order.number} • ${order.name}',
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          Text(order.items.join('\n')),
+                          Text('Total: ₹${order.total} • Pay at pickup'),
+                          Text('Pickup: ${TimeOfDay.fromDateTime(order.pickup).format(context)}'),
+                          const SizedBox(height: 12),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 300),
+                            child: Text(
+                              Order.stages[order.stage],
+                              key: ValueKey(order.stage),
+                              style: const TextStyle(fontSize: 20, color: Colors.teal),
+                            ),
+                          ),
+                          if (order.stage < Order.stages.length - 1)
+                            TextButton(
+                              onPressed: () => canteen.advance(order),
+                              child: const Text('Demo: next status'),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            Text(
-              'ORDER AHEAD. EAT HAPPY.',
-              style: TextStyle(
-                fontSize: 7.5,
-                letterSpacing: 1.25,
-                color: muted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ],
-    ),
-  );
+    );
+  }
 }

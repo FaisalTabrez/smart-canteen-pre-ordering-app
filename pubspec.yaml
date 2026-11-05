@@ -1,5 +1,5 @@
 name: smart_canteen
-description: A campus canteen pre-ordering app with an offline demo workflow.
+description: A simple Flutter canteen project covering the MR-22 lab syllabus.
 publish_to: none
 version: 1.0.0+1
 
@@ -10,7 +10,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  shared_preferences: ^2.5.3
+  provider: ^6.1.5
+  http: ^1.5.0
 
 dev_dependencies:
   flutter_test:
@@ -20,16 +21,5 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   assets:
-    - assets/fonts/OFL.txt
-    - assets/fonts/NotoEmoji-LICENSE.txt
-  fonts:
-    - family: Lato
-      fonts:
-        - asset: assets/fonts/Lato-Regular.ttf
-        - asset: assets/fonts/Lato-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Lato-Black.ttf
-          weight: 900
-    - family: Noto Color Emoji
-      fonts:
-        - asset: assets/fonts/NotoColorEmoji.ttf
+    - assets/menu.json
+    - assets/meal.png

@@ -1,92 +1,57 @@
 # Smart Canteen Pre-Ordering App
 
-A Flutter student project for ordering campus meals ahead of time. Includes a digital menu, cart, checkout, and order tracking in a responsive Material 3 interface.
-
-![Smart Canteen desktop menu](docs/screenshots/menu-desktop.png)
-
-<img src="docs/screenshots/order-phone.png" width="300" alt="Smart Canteen order tracking on a phone">
-
-## Features
-
-- Twelve Indian canteen dishes with rupee prices, preparation times, vegetarian labels, favourites, and sold-out states.
-- Search dishes and filter by category, vegetarian items, and favourites.
-- Add/remove items, adjust quantities (up to 20 per dish), and see exact totals.
-- Checkout with a pickup name, a 15/30/45/60-minute pickup slot, and an optional kitchen note.
-- Pay at the counter; this demo collects no payments.
-- Track Confirmed → Preparing → Ready for pickup → Collected with labelled demo controls.
-- Cancel before preparation; reorder completed/cancelled orders at current prices and availability.
-- Save the cart, favourites, and order history locally using `shared_preferences`.
-- Duplicate-submit protection and save-before-commit checkout; a failed save keeps the cart available.
-- Phone bottom navigation and a desktop sidebar, with bundled fonts and emoji artwork.
+A small Flutter lab project: view a menu, add food to a cart, place a pickup order and check its status.
 
 ## Run
 
-Validated with Flutter **3.47.9** / Dart **3.13.7**. Use this stable version or a compatible newer Flutter SDK. Android, iOS, and web scaffolds are included.
+Install Flutter and add its `bin` folder to PATH, then run:
 
 ```sh
+flutter doctor
 flutter pub get
 flutter run -d chrome
 ```
 
-Alternatively, serve to any browser:
+Use `flutter run` with a connected Android device/emulator instead for Android. The project was checked with Flutter 3.47.9 and Dart 3.13.7. Native Android/iOS builds have not been checked here; Android needs its SDK, and iOS needs macOS and Xcode.
+
+## Files
+
+| File | Contents |
+| --- | --- |
+| `lib/main.dart` | Three screens, named routes, form, custom widgets and animations |
+| `lib/models.dart` | Food/order classes and the Provider cart state |
+| `lib/menu_api.dart` | HTTP request and JSON parsing |
+| `assets/menu.json` | Six sample dishes and prices |
+| `bin/basics.dart` | Simple Dart program for experiment 1 |
+| `test/` | Logic, API, widget, animation and layout tests |
+
+Only two app packages are used: `provider` and `http`. The implementation uses normal formatted Dart, small classes and standard Flutter widgets. See [SYLLABUS.md](SYLLABUS.md) for the experiment mapping.
+
+## Try the app
+
+1. Add a dish using **+**, then open the cart icon.
+2. Enter your name and choose a pickup time. An empty/short name shows a validation error.
+3. Tap **Place order**. The cart is cleared and an order is displayed.
+4. Tap **Demo: next status** to move through Placed, Preparing, Ready and Collected.
+
+The menu is fetched from this public repository using the GitHub REST contents API. It contains sample canteen data, not a live canteen feed. If the request fails or is rate-limited, choose **Retry** or **Use sample menu** to load the bundled JSON file. No token is needed.
+
+Orders are in memory for the current session. Restarting/reloading clears them. Status changes are manual simulations, no kitchen is connected, and no payment is collected. To keep the lab code small, the earlier favourites, search, storage, cancellation/reordering and custom fonts have been removed. The earlier version remains in Git history.
+
+## Check the project
 
 ```sh
-flutter run -d web-server --web-port 8080
-```
-
-Open `http://localhost:8080`. For Android, start an emulator or connect a device and run `flutter run`. An Android SDK and JDK are required. iOS builds require macOS and Xcode.
-
-## Demo walkthrough
-
-1. Search for Masala Dosa and tap **Add**.
-2. Open **Cart**, adjust a quantity, and enter a pickup name.
-3. Choose a pickup slot, optionally add a note, and tap **Place demo order**.
-4. In **Orders**, tap **Advance demo status** twice to demonstrate preparation and readiness.
-5. Tap **Mark as collected**, then **Order again** to repeat the order.
-6. Reload to confirm that local cart, favourites, and orders are retained.
-
-## Validation
-
-```sh
+dart run bin/basics.dart
 flutter analyze
 flutter test
 flutter build web --release --no-web-resources-cdn
 ```
 
-There are 13 automated tests covering totals, quantity limits, sold-out items, checkout validation, save failures, duplicate submission, persistence, order transitions, cancellation/reordering, the full phone checkout flow, and 360/768/1440-pixel layouts. Android and iOS binaries have not been built or tested in this workspace.
+See [VALIDATION.md](VALIDATION.md) for the latest results. For a debug APK on a machine with the Android tools, run `flutter build apk --debug`.
 
-Build an Android APK on a machine with the Android toolchain:
+## References
 
-```sh
-flutter build apk --debug
-```
-
-The generated release configuration uses Flutter's development signing setup. Configure your own application ID and release signing before store distribution.
-
-## Code map
-
-| File | Responsibility |
-| --- | --- |
-| `lib/main.dart` | Startup, theme, navigation, responsive shell |
-| `lib/models.dart` | Sample menu, order models and immutable order snapshots |
-| `lib/store.dart` | Local storage, cart operations, checkout and status rules |
-| `lib/screens.dart` | Menu, cart form and order tracking |
-| `lib/components.dart` | Reusable cards, artwork, prices and quantity controls |
-| `test/controller_test.dart` | Cart, persistence and state tests |
-| `test/app_test.dart` | Full user flow and layout checks |
-
-## Scope
-
-This is a functional **single-device project demo**. Orders and kitchen notes stay on the device/browser profile; kitchen status changes use manual demo controls. Pickup slots are relative to the device's current time. No login, online payments, server, live stock reservation, push notifications, or actual kitchen delivery is included. Clearing app/browser data removes local records. Preferences are suitable for this demonstration, not a production order database.
-
-For a real canteen, add an authenticated backend, server-side pricing/stock validation, a kitchen dashboard, live status updates, opening hours and pickup capacity, reliable order storage, and an optional payment provider.
-
-## Resources and licences
-
-- [Flutter installation](https://docs.flutter.dev/install)
-- [Flutter web setup](https://docs.flutter.dev/platform-integration/web/setup)
-- [shared_preferences](https://pub.dev/packages/shared_preferences)
-- [Lato font source](https://github.com/google/fonts/tree/main/ofl/lato); SIL Open Font License in `assets/fonts/OFL.txt`.
-- [Noto Color Emoji source](https://github.com/googlefonts/noto-emoji); SIL Open Font License in `assets/fonts/NotoEmoji-LICENSE.txt`.
-
-Sample food artwork uses Unicode emoji rendered with the bundled Noto font. No image API keys are required.
+- [Flutter setup](https://docs.flutter.dev/install)
+- [Fetch data from the internet](https://docs.flutter.dev/cookbook/networking/fetch-data)
+- [Provider](https://pub.dev/packages/provider)
+- [GitHub REST repository contents API](https://docs.github.com/en/rest/repos/contents#get-repository-content)
